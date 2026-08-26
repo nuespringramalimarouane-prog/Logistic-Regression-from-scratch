@@ -5,113 +5,51 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 
 
-# ============================================================
-# Load the dataset
-# ============================================================
+# 1. Load Data
+df = pd.read_csv("dataset.csv")
 
-dataset = pd.read_csv("dataset.csv")
+# drop duplicated data 
+df = df.drop_duplicates()
+# remove rows with null values
+df = df.dropna(axis=0)
+
+# 2. Clean Outliers (Crucial for Cardiovascular Dataset)
+# Keep physiological boundaries
+df = df[(df["ap_hi"] >= 80) & (df["ap_hi"] <= 220)]
+df = df[(df["ap_lo"] >= 40) & (df["ap_lo"] <= 140)]
+df = df[df["ap_hi"] > df["ap_lo"]]
+
+# Convert Age from days to years
+df["age_years"] = (df["age"] / 365.25).round(1)
+
+# 3. Feature Engineering
+df["BMI"] = df["weight"] / ((df["height"] / 100) ** 2)
+df["p_p"] = df["ap_hi"] - df["ap_lo"]
+df["MAP"] = df["ap_lo"] + (df["p_p"] / 3)
+df["BPR"] = df["ap_hi"] / df["ap_lo"].replace(0, 1)
 
 
-# ============================================================
-# Get features from the dataset
-# ============================================================
-
-# One-hot encode categorical features
-X_data = pd.get_dummies(
-    dataset.drop(columns=["cardio"]),
-    columns=["cholesterol", "gluc"],
-    drop_first=True
+# 4. One-Hot Encoding
+X = pd.get_dummies(
+    df.drop(columns=["cardio", "age"]),
+    columns=["cholesterol", "gluc","gender"],
+    drop_first=True,
+    dtype=int
 )
+y = df["cardio"].astype(int)
 
-
-# ============================================================
-# Feature Engineering
-# ============================================================
-
-# BMI
-weight = X_data.get("weight")
-height = X_data.get("height")
-
-BMI_data = weight / (height / 100) ** 2
-
-
-# Pulse Pressure = ap_hi - ap_lo
-ap_hi = X_data.get("ap_hi")
-ap_lo = X_data.get("ap_lo")
-
-p_p = ap_hi - ap_lo
-
-
-# Blood Pressure Ratio → ap_hi / ap_lo
-bpr_aplo = ap_lo
-bpr_aplo[bpr_aplo == 0] = 1
-
-BPR = ap_hi / bpr_aplo
-
-
-# Mean Arterial Pressure (MAP)
-# MAP → (ap_lo + (ap_hi - ap_lo) / 3)
-MAP = (ap_lo + (ap_hi - ap_lo) / 3)
-
-
-# Add engineered features
-X_data["BMI"] = BMI_data
-X_data["p_p"] = p_p
-X_data["MAP"] = MAP
-X_data["BPR"] = BPR
-
-
-# ============================================================
-# Normalize Continuous Features
-# ============================================================
-
-continuous_cols = [
-    "age",
-    "height",
-    "weight",
-    "BMI",
-    "BPR",
-    "p_p",
-    "MAP",
-    "ap_hi",
-    "ap_lo"
-]
-
-X_mean = X_data[continuous_cols].mean()
-X_scale = X_data[continuous_cols].max() - X_data[continuous_cols].min()
-
-X_data[continuous_cols] = (
-    X_data[continuous_cols] - X_mean
-) / X_scale
-
-
-# ============================================================
-# Get Target
-# ============================================================
-
-y_data = dataset.get("cardio")
-
-
-# ============================================================
-# Split Train / Test Data
-# ============================================================
-
+# 5. Split First (Prevents Data Leakage)
 X_train, X_test, y_train, y_test = train_test_split(
-    X_data,
-    y_data,
-    test_size=0.3,
-    random_state=42
+    X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-
-X_train = X_train.to_numpy(dtype=float)
-X_test = X_test.to_numpy(dtype=float)
-
-y_train = y_train.to_numpy(dtype=float)
-y_test = y_test.to_numpy(dtype=float)
-
+# 6. Standard Scaling
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
 # ============================================================
 # Logistic Regression Functions
@@ -161,8 +99,8 @@ def cost(m, y, sig):
 def gradient_descent(
     x,
     y,
-    alpha=0.99,
-    num_iters=9000
+    alpha=0.03,
+    num_iters=1000
 ):
 
     m = x.shape[0]
@@ -200,7 +138,7 @@ def gradient_descent(
 # ============================================================
 
 w, b, cost_history = gradient_descent(
-    X_train,
+    X_train_scaled,
     y_train
 )
 
@@ -209,14 +147,10 @@ w, b, cost_history = gradient_descent(
 # Scikit-learn Logistic Regression
 # ============================================================
 
-model = LogisticRegression()
+model = LogisticRegression(max_iter=1000)
+model.fit(X_train_scaled, y_train)
 
-model.fit(
-    X_train,
-    y_train
-)
-
-y_model_preds = model.predict(X_test)
+y_model_preds = model.predict(X_test_scaled)
 
 acc_model = accuracy_score(
     y_test,
@@ -247,7 +181,7 @@ plt.show()
 # ============================================================
 
 y_pred_probs = sigmoid(
-    fx_wb(w, X_test, b)
+    fx_wb(w, X_test_scaled, b)
 )
 
 y_pred_class = (
@@ -267,6 +201,3 @@ acc = accuracy_score(
 
 print(f"Accuracy: {acc}")
 print(f"Accuracy model: {acc_model}")
-
-print(f"w : {w}")
-print(f"b:{b}")
