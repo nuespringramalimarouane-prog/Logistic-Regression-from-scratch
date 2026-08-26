@@ -36,45 +36,41 @@ The dataset contains the following columns:
 
 ## How It Works
 
-### 1. Load and encode the data
+### 1. Load and clean the data
 
-The script reads the CSV with pandas. The categorical `cholesterol` and `gluc` columns are converted into numeric one-hot encoded columns with `pd.get_dummies()`.
+The script reads the CSV with pandas, removes duplicate rows and rows containing null values, and filters out implausible blood-pressure measurements. It keeps rows where:
+
+- `ap_hi` is between `80` and `220`.
+- `ap_lo` is between `40` and `140`.
+- `ap_hi` is greater than `ap_lo`.
 
 ### 2. Engineer additional features
 
-Four features are calculated from the existing measurements:
+Five features are calculated from the existing measurements:
 
+- **Age in years**: `age / 365.25`, rounded to one decimal place.
 - **BMI**: `weight / (height / 100)²`
 - **Pulse pressure**: `ap_hi - ap_lo`
-- **Blood pressure ratio**: `ap_hi / ap_lo`
 - **Mean arterial pressure**: `ap_lo + (ap_hi - ap_lo) / 3`
+- **Blood pressure ratio**: `ap_hi / ap_lo`
 
-If a diastolic pressure value is zero, it is replaced with `1` before calculating the blood-pressure ratio to avoid division by zero.
+If a diastolic pressure value is zero, it is replaced with `1` before calculating the blood-pressure ratio to avoid division by zero. The original `age` column is removed after `age_years` is calculated.
 
-### 3. Normalize continuous features
+### 3. Encode and split the data
 
-Selected continuous columns are scaled using:
+The categorical `cholesterol`, `gluc`, and `gender` columns are converted to numeric one-hot encoded columns with `pd.get_dummies()`. The first category is dropped from each encoded column group to avoid redundant features.
 
-```text
-(value - column_mean) / (column_max - column_min)
-```
+The data is split into 80% training data and 20% test data. The split uses `random_state=42` and `stratify=y`, preserving the class distribution in both sets.
 
-This helps gradient descent optimize the model more consistently across features with different units and ranges.
+### 4. Standardize the features
 
-### 4. Split the data
-
-The data is split into:
-
-- 70% training data
-- 30% test data
-
-The split uses `random_state=42`, making the result reproducible.
+`StandardScaler` is fitted only on the training features. The same fitted scaler transforms the test features, preventing test-set information from influencing preprocessing.
 
 ### 5. Train and evaluate both models
 
-The custom model uses the sigmoid function, binary cross-entropy cost, and gradient descent. It runs with a learning rate of `0.99` for `9,000` iterations.
+The custom model uses the sigmoid function, binary cross-entropy cost, and gradient descent. It runs with a learning rate of `0.03` for `1,000` iterations.
 
-The scikit-learn model uses `sklearn.linear_model.LogisticRegression` with its default settings.
+The scikit-learn model uses `sklearn.linear_model.LogisticRegression` with `max_iter=1000`.
 
 Both models predict the test set, and their accuracy is calculated with `accuracy_score`.
 
@@ -121,16 +117,14 @@ The program will:
 
 1. Train the custom logistic regression model.
 2. Train the scikit-learn logistic regression model.
-3. Print both accuracy scores, the custom model weights, and its bias.
+3. Print both accuracy scores.
 4. Open a plot showing cost-function convergence over the gradient-descent iterations.
 
 Example output format:
 
 ```text
-Accuracy: <custom model accuracy>
-Accuracy model: <scikit-learn accuracy>
-w : [<weights>]
-b:<bias>
+Accuracy my own model: <custom model accuracy>
+Accuracy sklearn model: <scikit-learn accuracy>
 ```
 
 The exact accuracy values can vary if the dataset or preprocessing changes.
@@ -142,6 +136,3 @@ The exact accuracy values can vary if the dataset or preprocessing changes.
 - The preprocessing statistics are calculated before the train/test split. For a production machine-learning workflow, calculate them from the training set only to avoid data leakage.
 - The dataset is loaded with a relative path, so run the script from the project directory or update the path in `main.py`.
 
-## License
-
-No license has been specified for this project.

@@ -199,5 +199,5 @@ acc = accuracy_score(
 )
 
 
-print(f"Accuracy: {acc}")
-print(f"Accuracy model: {acc_model}")
+print(f"Accuracy my own model: {acc}")
+print(f"Accuracy sklearn model: {acc_model}")
