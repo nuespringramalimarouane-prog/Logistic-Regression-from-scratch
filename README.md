@@ -133,6 +133,6 @@ The exact accuracy values can vary if the dataset or preprocessing changes.
 
 - This is an educational implementation, not a clinical diagnostic tool.
 - The script currently displays the convergence plot with `plt.show()`, so execution may wait until the plot window is closed.
-- The preprocessing statistics are calculated before the train/test split. For a production machine-learning workflow, calculate them from the training set only to avoid data leakage.
+- The train/test split is performed before fitting `StandardScaler`; the scaler is fitted on `X_train` and then applied to `X_test`. This avoids leaking test-set scaling statistics into training.
 - The dataset is loaded with a relative path, so run the script from the project directory or update the path in `main.py`.
 
